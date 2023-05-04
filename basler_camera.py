@@ -12,28 +12,29 @@ class BaslerCamera:
         info.SetSerialNumber(serial_number)
         try:
             self.cam = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice(info))
-
-
-            # setup center scan line
-            self.cam.Height = self.cam.Height.Max
-            self.cam.Width = self.cam.Width.Max
-            self.cam.CenterX = True
-            self.cam.CenterY = True
-
-            # setup for
-            # self.cam.PixelFormat = "BGR8"
-            # self.cam.Gain = 20
-            self.cam.ExposureTimeAbs = 20000
         except Exception as e:
             print(e)
 
         self.is_grubbed = False
 
+    def __open(self):
+        self.cam.Open()
+        # setup center scan line
+        self.cam.Height = self.cam.Height.Max
+        self.cam.Width = self.cam.Width.Max
+        self.cam.CenterX = True
+        self.cam.CenterY = True
+
+        # setup for
+        self.cam.ExposureAuto = 'Off'
+        self.cam.ExposureTimeAbs = 1000
+        self.cam.AcquisitionFrameRateEnable = True
+        self.cam.AcquisitionFrameRateAbs = 90
+
     @thread
     def start_grubbing(self, event):
         self.is_grubbed = True
-        self.cam.Open()
-
+        self.__open()
         self.cam.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
         converter = pylon.ImageFormatConverter()
 

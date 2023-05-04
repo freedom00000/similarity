@@ -44,14 +44,27 @@ class SimilarityApp(QtWidgets.QMainWindow, design.main_window.Ui_MainWindow):
         self.fps_cnt = 0
         self.fps = 0
 
+        self.speed_list = [0] * 1000
+        self.x_list = list(range(len(self.speed_list)))
+        self.speed_cnt = 0
+
     def __change_speed(self, speed):
-        self.labelSpeed.setText(str(speed))
+        self.labelSpeed.setText(str(self.worker.speed))
         td = timedelta(seconds=time.time() - self.start_time)
         self.labelUptime.setText(str(td))
+        # self.speed_list[self.speed_cnt] = int(speed)
+        # if self.speed_cnt % 10 == 0:
+        #     self.__set_plot_values()
+        #
+        # self.speed_cnt = self.speed_cnt + 1 if self.speed_cnt < len(self.speed_list) - 1 else 0
+
+    @utils.thread
+    def __set_plot_values(self):
+        self.plotWidget.plot(self.x_list, self.speed_list)
 
     def __change_top_left_image(self, img):
         self.topLeftLabel.setPixmap(utils.cv_to_qt_image(img))
-        if self.fps_cnt > 20:
+        if self.fps_cnt > 30:
             self.fps = round(self.fps / self.fps_cnt)
             self.labelFps.setText(str(self.fps))
             self.fps_cnt = 0
@@ -78,6 +91,11 @@ class SimilarityApp(QtWidgets.QMainWindow, design.main_window.Ui_MainWindow):
 
     def make_template(self):
         self.worker.make_template()
+
+        self.topRightLabel_3.setPixmap(utils.cv_to_qt_image(self.worker.top_right_processor.src_template))
+        self.topLeftLabel_3.setPixmap(utils.cv_to_qt_image(self.worker.top_left_processor.src_template))
+        self.btmRightLabel_3.setPixmap(utils.cv_to_qt_image(self.worker.btm_right_processor.src_template))
+        self.btmLeftLabel_3.setPixmap(utils.cv_to_qt_image(self.worker.btm_left_processor.src_template))
 
 
 if __name__ == '__main__':

@@ -29,5 +29,9 @@ def resize_image(img, scale=60):
 
 
 def cv_to_qt_image(img):
-    convert = QImage(img, img.shape[1], img.shape[0], img.strides[0], QImage.Format.Format_BGR888)
-    return QPixmap.fromImage(convert)
+    try:
+        convert = QImage(img, img.shape[1], img.shape[0], img.strides[0], QImage.Format.Format_BGR888)
+        return QPixmap.fromImage(convert)
+    except Exception as e:
+        print(e)
+        return None
