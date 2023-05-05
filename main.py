@@ -1,5 +1,7 @@
+import os
 import sys
 import time
+import shutil
 from datetime import timedelta
 
 from PyQt6 import QtWidgets
@@ -10,6 +12,7 @@ from PyQt6.QtWidgets import QSplashScreen
 import design.main_window
 import utils
 from worker import Worker
+import const
 
 
 class SplashScreen(QSplashScreen):
@@ -31,6 +34,9 @@ class SimilarityApp(QtWidgets.QMainWindow, design.main_window.Ui_MainWindow):
         self.startButton.clicked.connect(self.start)
         self.stopButton.clicked.connect(self.stop)
         self.templateButton.clicked.connect(self.make_template)
+        self.clearButton.clicked.connect(self.clear_records)
+
+        self.checkBoxRecord.clicked.connect(self.change_record_status)
 
         self.worker = Worker()
         self.worker.speed_trigger.connect(self.__change_speed)
@@ -97,8 +103,27 @@ class SimilarityApp(QtWidgets.QMainWindow, design.main_window.Ui_MainWindow):
         self.btmRightLabel_3.setPixmap(utils.cv_to_qt_image(self.worker.btm_right_processor.src_template))
         self.btmLeftLabel_3.setPixmap(utils.cv_to_qt_image(self.worker.btm_left_processor.src_template))
 
+    def clear_records(self):
+        self.worker.record_mode = False
+        shutil.rmtree(const.OUTPUT_DIR)
+        create_output_dirs()
+        self.change_record_status()
+
+    def change_record_status(self):
+        self.worker.record_mode = self.checkBoxRecord.isChecked()
+
+
+def create_output_dirs():
+    dirs = [const.TEMPLATE_DIR, const.TOP_LEFT_DIR, const.TOP_RIGHT_DIR, const.BTM_LEFT_DIR, const.BTM_RIGHT_DIR]
+    for d in dirs:
+        directory = f'{const.OUTPUT_DIR}/{d}'
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
 
 if __name__ == '__main__':
+    create_output_dirs()
+
     app = QtWidgets.QApplication(sys.argv)
 
     splash = SplashScreen()

@@ -4,6 +4,7 @@ import cv2
 from PyQt6.QtCore import pyqtSignal, QThread
 
 import basler_camera
+import const
 import utils
 from image_processing import ImageProcessor
 
@@ -30,6 +31,7 @@ class Worker(QThread):
     def __init__(self, parent=None):
         super(Worker, self).__init__(parent)
         self.is_worked = None
+        self.record_mode = False
         self.speed = 0
         self.grub_time = get_time_ms()
 
@@ -97,6 +99,7 @@ class Worker(QThread):
                 if self.top_left_processor.has_template():
                     img_t = self.top_left_processor.compare(img)
                     self.top_left_trigger.emit(img_t)
+                    cv2.imwrite(f'{const.OUTPUT_DIR}/{const.TOP_LEFT_DIR}/{time.time()}.jpg')
                     return
                 else:
                     self.top_left_trigger.emit(img)
@@ -107,6 +110,7 @@ class Worker(QThread):
                 if self.btm_left_processor.has_template():
                     img_b = self.btm_left_processor.compare(img)
                     self.btm_left_trigger.emit(img_b)
+                    cv2.imwrite(f'{const.OUTPUT_DIR}/{const.BTM_LEFT_DIR}/{time.time()}.jpg')
                     return
                 else:
                     self.btm_left_trigger.emit(img)
@@ -126,6 +130,7 @@ class Worker(QThread):
                 if self.top_right_processor.has_template():
                     img_t = self.top_right_processor.compare(img)
                     self.top_right_trigger.emit(img_t)
+                    cv2.imwrite(f'{const.OUTPUT_DIR}/{const.TOP_RIGHT_DIR}/{time.time()}.jpg')
                     return
                 else:
                     self.top_right_trigger.emit(img)
@@ -136,6 +141,7 @@ class Worker(QThread):
                 if self.btm_right_processor.has_template():
                     img_b = self.btm_right_processor.compare(img)
                     self.btm_right_trigger.emit(img_b)
+                    cv2.imwrite(f'{const.OUTPUT_DIR}/{const.BTM_RIGHT_DIR}/{time.time()}.jpg')
                     return
                 else:
                     self.btm_right_trigger.emit(img)
@@ -151,6 +157,12 @@ class Worker(QThread):
             self.top_right_processor.make_template(self.top_right_image)
             self.btm_left_processor.make_template(self.btm_left_image)
             self.btm_right_processor.make_template(self.btm_right_image)
+
+            cv2.imwrite(f'{const.OUTPUT_DIR}/{const.TEMPLATE_DIR}/top_left.jpg', self.top_left_processor.src_template)
+            cv2.imwrite(f'{const.OUTPUT_DIR}/{const.TEMPLATE_DIR}/top_right.jpg', self.top_right_processor.src_template)
+            cv2.imwrite(f'{const.OUTPUT_DIR}/{const.TEMPLATE_DIR}/btm_left.jpg', self.btm_left_processor.src_template)
+            cv2.imwrite(f'{const.OUTPUT_DIR}/{const.TEMPLATE_DIR}/btm_right.jpg', self.btm_right_processor.src_template)
+
         except Exception as e:
             print(e)
 
