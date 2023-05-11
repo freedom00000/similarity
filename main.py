@@ -55,7 +55,7 @@ class SimilarityApp(QtWidgets.QMainWindow, design.main_window.Ui_MainWindow):
         self.speed_cnt = 0
 
     def __change_speed(self, speed):
-        self.labelSpeed.setText(str(self.worker.speed))
+        self.labelSpeed.setText(str(self.worker.hola.speed))
         td = timedelta(seconds=time.time() - self.start_time)
         self.labelUptime.setText(str(td))
         # self.speed_list[self.speed_cnt] = int(speed)
@@ -88,12 +88,19 @@ class SimilarityApp(QtWidgets.QMainWindow, design.main_window.Ui_MainWindow):
     def __change_btm_right_image(self, img):
         self.btmRightLabel.setPixmap(utils.cv_to_qt_image(img))
 
+    def start1(self):
+        self.start_time = time.time()
+        self.worker.start_work()
+
+    def stop1(self):
+        self.worker.stop_work()
+
     def start(self):
         self.start_time = time.time()
         self.worker.start_work()
 
     def stop(self):
-        self.worker.stop_work()
+        self.worker.stop_work1()
 
     def make_template(self):
         self.worker.make_template()

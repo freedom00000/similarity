@@ -6,12 +6,13 @@ from PyQt6.QtCore import pyqtSignal, QThread
 import basler_camera
 import const
 import utils
+from hola import Hola
 from image_processing import ImageProcessor
 
 MIN_WHITE_VALUE = 25
 
 POINTS_X = [1350, 1400, 1350, 1400]
-POINTS_Y = [225, 225, 275, 275]
+POINTS_Y = [225, 225, 245, 245]
 
 MAX_SPEED_NO_CHANGES = 200
 SKIP_AFTER_POINT = 12
@@ -32,8 +33,10 @@ class Worker(QThread):
         super(Worker, self).__init__(parent)
         self.is_worked = None
         self.record_mode = False
-        self.speed = 0
+        # self.speed = 0
         self.grub_time = get_time_ms()
+
+        self.hola = Hola()
 
         self.top_left_processor = ImageProcessor()
         self.top_right_processor = ImageProcessor()
@@ -52,54 +55,59 @@ class Worker(QThread):
         self.grabbed_btm_l = False
         self.grabbed_btm_r = False
 
-    @utils.thread
-    def __calc_speed(self, img):
-        if self.need_skip > 0:
-            self.need_skip -= 1
-        else:
-            white_points = 0
-            for x, y in zip(POINTS_X, POINTS_Y):
-                pixel = img[y, x]
-                if pixel[0] >= MIN_WHITE_VALUE and pixel[1] >= MIN_WHITE_VALUE and pixel[2] >= MIN_WHITE_VALUE:
-                    white_points += 1
-
-            if white_points > 2:
-                now = get_time_ms()
-                self.speed = round(500.0 / (now - self.prev_time).total_seconds(), 1)
-                self.prev_time = now
-                self.need_skip = SKIP_AFTER_POINT
-
-                self.grabbed_top_l = self.grabbed_top_r = self.grabbed_btm_l = self.grabbed_btm_r = False
-                self.speed_no_changes = 0
-            else:
-                self.speed_no_changes += 1
-
-            if self.speed_no_changes > MAX_SPEED_NO_CHANGES:
-                self.speed = 0
-
-        self.speed_trigger.emit(self.speed)
+    # @utils.thread
+    # def __calc_speed(self, img):
+    #     if self.need_skip > 0:
+    #         self.need_skip -= 1
+    #     else:
+    #         white_points = 0
+    #         for x, y in zip(POINTS_X, POINTS_Y):
+    #             pixel = img[y, x]
+    #             if pixel[0] >= MIN_WHITE_VALUE and pixel[1] >= MIN_WHITE_VALUE and pixel[2] >= MIN_WHITE_VALUE:
+    #                 white_points += 1
+    #
+    #         if white_points > 2:
+    #             now = get_time_ms()
+    #             self.speed = round(500.0 / (now - self.prev_time).total_seconds(), 1)
+    #             self.prev_time = now
+    #             self.need_skip = SKIP_AFTER_POINT
+    #
+    #             self.grabbed_top_l = self.grabbed_top_r = self.grabbed_btm_l = self.grabbed_btm_r = False
+    #             self.speed_no_changes = 0
+    #         else:
+    #             self.speed_no_changes += 1
+    #
+    #         if self.speed_no_changes > MAX_SPEED_NO_CHANGES:
+    #             self.speed = 0
+    #
+    #     self.speed_trigger.emit(self.speed)
 
     def __calc_totals(self):
-        t1 = 200 / self.speed
-        t2 = (t1 + 105) / self.speed
+        if self.hola.speed > 0:
+            t1 = 200 / self.hola.speed
+            t2 = t1 + 105 / self.hola.speed
 
-        top_total = (get_time_ms() - self.prev_time + timedelta(milliseconds=t1)).total_seconds()
-        btm_total = (get_time_ms() - self.prev_time + timedelta(milliseconds=t2)).total_seconds()
-        print('top', top_total, 'btm', btm_total)
-        return top_total, btm_total
+            top_total = (datetime.now() - self.hola.prev_time - timedelta(milliseconds=t1)).total_seconds()
+            btm_total = (datetime.now() - self.hola.prev_time - timedelta(milliseconds=t2)).total_seconds()
+            print('top', top_total, 'btm', btm_total)
+            return top_total, btm_total
+        else:
+            return 0, 0.5
 
     @utils.thread
     def __left_cam_event_handler(self, img):
-        self.__calc_speed(img)
-        if self.speed > 0 >= self.need_skip:
+        # self.__calc_speed(img)
+        self.speed_trigger.emit(self.hola.speed)
+        if self.hola.speed > 0 >= self.need_skip:
             top_total, btm_total = self.__calc_totals()
             if top_total >= 0 and not self.grabbed_top_l:
                 self.top_left_image = img
                 self.grabbed_top_l = True
                 if self.top_left_processor.has_template():
+                    cv2.imwrite(f'{const.OUTPUT_DIR}/{const.TOP_LEFT_DIR}/{time.time()}.jpg', img)
                     img_t = self.top_left_processor.compare(img)
                     self.top_left_trigger.emit(img_t)
-                    cv2.imwrite(f'{const.OUTPUT_DIR}/{const.TOP_LEFT_DIR}/{time.time()}.jpg')
+
                     return
                 else:
                     self.top_left_trigger.emit(img)
@@ -108,9 +116,10 @@ class Worker(QThread):
                 self.btm_left_image = img
                 self.grabbed_btm_l = True
                 if self.btm_left_processor.has_template():
+                    cv2.imwrite(f'{const.OUTPUT_DIR}/{const.BTM_LEFT_DIR}/{time.time()}.jpg', img)
                     img_b = self.btm_left_processor.compare(img)
                     self.btm_left_trigger.emit(img_b)
-                    cv2.imwrite(f'{const.OUTPUT_DIR}/{const.BTM_LEFT_DIR}/{time.time()}.jpg')
+
                     return
                 else:
                     self.btm_left_trigger.emit(img)
@@ -122,15 +131,16 @@ class Worker(QThread):
 
     @utils.thread
     def __right_cam_event_handler(self, img):
-        if self.speed > 0 >= self.need_skip:
+        if self.hola.speed > 0 >= self.need_skip:
             top_total, btm_total = self.__calc_totals()
             if top_total >= 0 and not self.grabbed_top_r:
                 self.top_right_image = img
                 self.grabbed_top_r = True
                 if self.top_right_processor.has_template():
+                    cv2.imwrite(f'{const.OUTPUT_DIR}/{const.TOP_RIGHT_DIR}/{time.time()}.jpg', img)
                     img_t = self.top_right_processor.compare(img)
                     self.top_right_trigger.emit(img_t)
-                    cv2.imwrite(f'{const.OUTPUT_DIR}/{const.TOP_RIGHT_DIR}/{time.time()}.jpg')
+
                     return
                 else:
                     self.top_right_trigger.emit(img)
@@ -139,9 +149,10 @@ class Worker(QThread):
                 self.btm_right_image = img
                 self.grabbed_btm_r = True
                 if self.btm_right_processor.has_template():
+                    cv2.imwrite(f'{const.OUTPUT_DIR}/{const.BTM_RIGHT_DIR}/{time.time()}.jpg', img)
                     img_b = self.btm_right_processor.compare(img)
                     self.btm_right_trigger.emit(img_b)
-                    cv2.imwrite(f'{const.OUTPUT_DIR}/{const.BTM_RIGHT_DIR}/{time.time()}.jpg')
+
                     return
                 else:
                     self.btm_right_trigger.emit(img)
@@ -166,12 +177,65 @@ class Worker(QThread):
         except Exception as e:
             print(e)
 
+    def start_work1(self):
+        self.is_worked = True
+        self.left_cam.start_grabbing(self.__left_cam_event_handler)
+        self.right_cam.start_grabbing(self.__right_cam_event_handler)
+
+    # -------- 2 ------------
+
+    def __left_top_handler(self, img):
+        cv2.imwrite(f'{const.OUTPUT_DIR}/{const.TOP_LEFT_DIR}/{time.time()}.jpg', img)
+        if self.top_left_processor.has_template():
+            img = self.top_left_processor.compare(img)
+
+        self.top_left_image = img
+        self.top_left_trigger.emit(img)
+
+    def __right_top_handler(self, img):
+        cv2.imwrite(f'{const.OUTPUT_DIR}/{const.TOP_RIGHT_DIR}/{time.time()}.jpg', img)
+        if self.top_right_processor.has_template():
+            img = self.top_right_processor.compare(img)
+
+        self.top_right_image = img
+        self.top_right_trigger.emit(img)
+
+    def __left_btm_handler(self, img):
+        cv2.imwrite(f'{const.OUTPUT_DIR}/{const.BTM_LEFT_DIR}/{time.time()}.jpg', img)
+        if self.btm_left_processor.has_template():
+            img = self.btm_left_processor.compare(img)
+
+        self.btm_left_image = img
+        self.btm_left_trigger.emit(img)
+
+    def __right_btm_handler(self, img):
+        cv2.imwrite(f'{const.OUTPUT_DIR}/{const.BTM_RIGHT_DIR}/{time.time()}.jpg', img)
+        if self.btm_right_processor.has_template():
+            img = self.btm_right_processor.compare(img)
+        self.btm_right_image = img
+        self.btm_right_trigger.emit(img)
+
+    def worker2(self):
+        self.speed_trigger.emit(self.hola.speed)
+        # top, btm = self.__calc_totals()
+        threads = [self.left_cam.grab(self.__left_top_handler),
+                   self.right_cam.grab(self.__right_top_handler)]
+        for t in threads:
+            t.join()
+        if self.hola.speed > 450:
+            time.sleep(210 / self.hola.speed)
+        else:
+            time.sleep(0.2)
+        self.left_cam.grab(self.__left_btm_handler)
+        self.right_cam.grab(self.__right_btm_handler)
+
+    def stop_work1(self):
+        self.is_worked = False
+        self.hola.stop()
+        self.left_cam.stop_grabbing()
+        self.right_cam.stop_grabbing()
+
     def start_work(self):
         self.is_worked = True
-        self.left_cam.start_grubbing(self.__left_cam_event_handler)
-        self.right_cam.start_grubbing(self.__right_cam_event_handler)
-
-    def stop_work(self):
-        self.is_worked = False
-        self.left_cam.stop_grubbing()
-        self.right_cam.stop_grubbing()
+        self.worker2()
+        self.hola.start(self.worker2)

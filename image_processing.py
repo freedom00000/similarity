@@ -18,14 +18,14 @@ class ImageProcessor:
     def has_template(self):
         try:
             return self.template.any()
-        except Exception as e:
-            print(e)
+        except:
             return False
 
     def make_template(self, template):
         self.src_template = template
+        self.src_template = cv2.rectangle(self.src_template, (130, 100), (1380, 1000), (0,0,255), 2)
         template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
-        self.template = template[100: 900, 20: 1200]
+        self.template = template[130: 1000, 100: 1380]
 
     def __get_processing_area(self, img):
         img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -62,9 +62,9 @@ class ImageProcessor:
         # obtain the regions of the two input images that differ
         thresh = cv2.threshold(diff, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
 
-        kernel = np.ones((10, 10), np.uint8)
-        thresh = cv2.erode(thresh, kernel, iterations=5)
-        thresh = cv2.dilate(thresh, kernel, iterations=5)
+        kernel = np.ones((5, 5), np.uint8)
+        thresh = cv2.erode(thresh, kernel, iterations=3)
+        thresh = cv2.dilate(thresh, kernel, iterations=3)
 
         contours = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours = contours[0] if len(contours) == 2 else contours[1]
@@ -80,10 +80,10 @@ class ImageProcessor:
                 cv2.rectangle(after_gray, (x, y), (x + w, y + h), (36, 255, 12), 2)
                 cv2.rectangle(diff_box, (x, y), (x + w, y + h), (36, 255, 12), 2)
 
-                x_n, y_n = coordinate_conversion((x, y), img.shape, after.shape)
+                # x_n, y_n = coordinate_conversion((x, y), img.shape, after.shape)
+                #
+                # cv2.rectangle(img, (x_n, y_n), (x_n + w, y_n + h), (36, 255, 12), 2)
+                cv2.drawContours(mask, [c], 0, (255, 255, 255), 2)
+                cv2.drawContours(filled_after, [c], 0, (0, 255, 0), 2)
 
-                cv2.rectangle(img, (x_n, y_n), (x_n + w, y_n + h), (36, 255, 12), 2)
-                cv2.drawContours(mask, [c], 0, (255, 255, 255), -1)
-                cv2.drawContours(filled_after, [c], 0, (0, 255, 0), -1)
-
-        return img
+        return cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
