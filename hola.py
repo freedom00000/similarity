@@ -52,6 +52,10 @@ class Hola:
         self.hola.close()
 
 
+def test():
+    print(hola.speed)
+
+
 if __name__ == "__main__":
     hola = Hola()
-    hola.start()
+    hola.start(test)

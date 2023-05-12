@@ -1,6 +1,12 @@
+import glob
+
 import cv2
 import numpy as np
 from skimage.metrics import structural_similarity
+
+import utils
+
+RECT = ((100, 100), (1000, 1340))
 
 
 def coordinate_conversion(point, o_shape, c_shape):
@@ -22,10 +28,10 @@ class ImageProcessor:
             return False
 
     def make_template(self, template):
-        self.src_template = template
-        self.src_template = cv2.rectangle(self.src_template, (130, 100), (1380, 1000), (0,0,255), 2)
+        self.src_template = template.copy()
+        cv2.rectangle(self.src_template, (RECT[0][1], RECT[0][0]), (RECT[1][1], RECT[1][0]), (0, 0, 255), 2)
         template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
-        self.template = template[130: 1000, 100: 1380]
+        self.template = template[RECT[0][0]: RECT[1][0], RECT[0][1]: RECT[1][1]]
 
     def __get_processing_area(self, img):
         img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -39,7 +45,7 @@ class ImageProcessor:
         y = int(pt[1])
 
         crop = img[y: y + h, x: x + w]
-
+        cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 12), 2)
         return crop
 
     def compare(self, img):
@@ -62,28 +68,52 @@ class ImageProcessor:
         # obtain the regions of the two input images that differ
         thresh = cv2.threshold(diff, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
 
-        kernel = np.ones((5, 5), np.uint8)
+        kernel = np.ones((7, 7), np.uint8)
         thresh = cv2.erode(thresh, kernel, iterations=3)
         thresh = cv2.dilate(thresh, kernel, iterations=3)
 
-        contours = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        drawing = np.zeros(img.shape[:2], dtype=np.uint8)
+        drawing[RECT[0][0]: RECT[1][0], RECT[0][1]: RECT[1][1]] = thresh
+
+        contours = cv2.findContours(drawing, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours = contours[0] if len(contours) == 2 else contours[1]
 
-        mask = np.zeros(before_gray.shape, dtype='uint8')
-        filled_after = after_gray.copy()
-
+        # mask = np.zeros(before_gray.shape, dtype='uint8')
+        # filled_after = after_gray.copy()
+        # drawing = cv2.cvtColor(drawing, cv2.COLOR_GRAY2BGR)
         for c in contours:
             area = cv2.contourArea(c)
             if area > 500:
                 x, y, w, h = cv2.boundingRect(c)
-                cv2.rectangle(before_gray, (x, y), (x + w, y + h), (36, 255, 12), 2)
-                cv2.rectangle(after_gray, (x, y), (x + w, y + h), (36, 255, 12), 2)
-                cv2.rectangle(diff_box, (x, y), (x + w, y + h), (36, 255, 12), 2)
+                # cv2.rectangle(before_gray, (x, y), (x + w, y + h), (36, 255, 12), 2)
+                # cv2.rectangle(after_gray, (x, y), (x + w, y + h), (36, 255, 12), 2)
+                # cv2.rectangle(diff_box, (x, y), (x + w, y + h), (36, 255, 12), 2)
 
-                # x_n, y_n = coordinate_conversion((x, y), img.shape, after.shape)
-                #
-                # cv2.rectangle(img, (x_n, y_n), (x_n + w, y_n + h), (36, 255, 12), 2)
-                cv2.drawContours(mask, [c], 0, (255, 255, 255), 2)
-                cv2.drawContours(filled_after, [c], 0, (0, 255, 0), 2)
+                # cv2.rectangle(drawing, (x, y), (x + w, y + h), (36, 255, 12), 2)
+                cv2.rectangle(img, (x, y), (x + w, y + h), (36, 255, 12), 2)
 
-        return cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
+                # cv2.drawContours(mask, [c], 0, (255, 255, 255), 2)
+                # cv2.drawContours(filled_after, [c], 0, (0, 255, 0), 2)
+
+        # return cv2.cvtColor(filled_after, cv2.COLOR_GRAY2BGR)
+        return img
+
+
+def test():
+    template = cv2.imread('TestImages/output/template/top_left.jpg')
+
+    pr = ImageProcessor()
+    pr.make_template(template)
+    files = glob.glob("TestImages/output/topLeft/*")
+    for im_path in files:
+        im = cv2.imread(im_path)
+        res, diff = pr.compare(im)
+        cv2.imshow('template', utils.resize_image(pr.src_template, scale=50))
+        cv2.imshow('src', utils.resize_image(im, scale=50))
+        cv2.imshow('res', utils.resize_image(res, scale=50))
+        cv2.imshow('diff', utils.resize_image(diff, scale=50))
+        cv2.waitKey(500)
+
+
+if __name__ == "__main__":
+    test()
