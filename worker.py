@@ -23,7 +23,7 @@ def get_time_ms():
 
 
 class Worker(QThread):
-    speed_trigger = pyqtSignal(int)
+    status_trigger = pyqtSignal()
     top_left_trigger = pyqtSignal(object)
     top_right_trigger = pyqtSignal(object)
     btm_left_trigger = pyqtSignal(object)
@@ -32,7 +32,7 @@ class Worker(QThread):
     def __init__(self, parent=None):
         super(Worker, self).__init__(parent)
         self.is_worked = None
-        self.record_mode = False
+        self._record_mode = False
         # self.speed = 0
         self.grub_time = get_time_ms()
 
@@ -54,6 +54,14 @@ class Worker(QThread):
         self.grabbed_top_r = False
         self.grabbed_btm_l = False
         self.grabbed_btm_r = False
+
+    @property
+    def record_mode(self):
+        return self._record_mode and self.hola.speed > 600
+
+    @record_mode.setter
+    def record_mode(self, val):
+        self._record_mode = val
 
     # @utils.thread
     # def __calc_speed(self, img):
@@ -97,7 +105,7 @@ class Worker(QThread):
     @utils.thread
     def __left_cam_event_handler(self, img):
         # self.__calc_speed(img)
-        self.speed_trigger.emit(self.hola.speed)
+        self.status_trigger.emit(self.hola.speed)
         if self.hola.speed > 0 >= self.need_skip:
             top_total, btm_total = self.__calc_totals()
             if top_total >= 0 and not self.grabbed_top_l:
@@ -185,49 +193,63 @@ class Worker(QThread):
     # -------- 2 ------------
 
     def __left_top_handler(self, img):
-        cv2.imwrite(f'{const.OUTPUT_DIR}/{const.TOP_LEFT_DIR}/{time.time()}.jpg', img)
+        if self.record_mode:
+            cv2.imwrite(f'{const.OUTPUT_DIR}/{const.TOP_LEFT_DIR}/{time.time()}.jpg', img)
         if self.top_left_processor.has_template():
-            img = self.top_left_processor.compare(img)
-
+            drawing = self.top_left_processor.compare(img)
+        else:
+            drawing = img.copy()
         self.top_left_image = img
-        self.top_left_trigger.emit(img)
+        self.top_left_trigger.emit(drawing)
 
     def __right_top_handler(self, img):
-        cv2.imwrite(f'{const.OUTPUT_DIR}/{const.TOP_RIGHT_DIR}/{time.time()}.jpg', img)
+        if self.record_mode:
+            cv2.imwrite(f'{const.OUTPUT_DIR}/{const.TOP_RIGHT_DIR}/{time.time()}.jpg', img)
         if self.top_right_processor.has_template():
-            img = self.top_right_processor.compare(img)
+            drawing = self.top_right_processor.compare(img)
+        else:
+            drawing = img.copy()
 
         self.top_right_image = img
-        self.top_right_trigger.emit(img)
+        self.top_right_trigger.emit(drawing)
 
+    @utils.thread
     def __left_btm_handler(self, img):
-        cv2.imwrite(f'{const.OUTPUT_DIR}/{const.BTM_LEFT_DIR}/{time.time()}.jpg', img)
+        if self.record_mode:
+            cv2.imwrite(f'{const.OUTPUT_DIR}/{const.BTM_LEFT_DIR}/{time.time()}.jpg', img)
         if self.btm_left_processor.has_template():
-            img = self.btm_left_processor.compare(img)
-
+            drawing = self.btm_left_processor.compare(img)
+        else:
+            drawing = img.copy()
         self.btm_left_image = img
-        self.btm_left_trigger.emit(img)
+        self.btm_left_trigger.emit(drawing)
 
+    @utils.thread
     def __right_btm_handler(self, img):
-        cv2.imwrite(f'{const.OUTPUT_DIR}/{const.BTM_RIGHT_DIR}/{time.time()}.jpg', img)
+        if self.record_mode:
+            cv2.imwrite(f'{const.OUTPUT_DIR}/{const.BTM_RIGHT_DIR}/{time.time()}.jpg', img)
         if self.btm_right_processor.has_template():
-            img = self.btm_right_processor.compare(img)
+            drawing = self.btm_right_processor.compare(img)
+        else:
+            drawing = img.copy()
         self.btm_right_image = img
-        self.btm_right_trigger.emit(img)
+        self.btm_right_trigger.emit(drawing)
 
     def worker2(self):
-        self.speed_trigger.emit(self.hola.speed)
         # top, btm = self.__calc_totals()
-        threads = [self.left_cam.grab(self.__left_top_handler),
-                   self.right_cam.grab(self.__right_top_handler)]
-        for t in threads:
-            t.join()
+        # threads = [self.left_cam.grab_one(self.__left_top_handler),
+        #            self.right_cam.grab_one(self.__right_top_handler)]
+        # for t in threads:
+        #     t.join()
+        self.left_cam.grab_one(self.__left_top_handler)
+        self.right_cam.grab_one(self.__right_top_handler)
         if self.hola.speed > 450:
-            time.sleep(210 / self.hola.speed)
+            time.sleep(190 / self.hola.speed)
+            # pass
         else:
             time.sleep(0.2)
-        self.left_cam.grab(self.__left_btm_handler)
-        self.right_cam.grab(self.__right_btm_handler)
+        self.left_cam.grab_one(self.__left_btm_handler)
+        self.right_cam.grab_one(self.__right_btm_handler)
 
     def stop_work1(self):
         self.is_worked = False
@@ -235,7 +257,14 @@ class Worker(QThread):
         self.left_cam.stop_grabbing()
         self.right_cam.stop_grabbing()
 
+    @utils.thread
+    def __status_update_loop(self):
+        while self.is_worked:
+            self.status_trigger.emit()
+            time.sleep(0.5)
+
     def start_work(self):
         self.is_worked = True
+        self.__status_update_loop()
         self.worker2()
         self.hola.start(self.worker2)

@@ -199,7 +199,7 @@
       <x>900</x>
       <y>9</y>
       <width>371</width>
-      <height>91</height>
+      <height>131</height>
      </rect>
     </property>
     <property name="title">
@@ -278,12 +278,66 @@
       <string>Clear records</string>
      </property>
     </widget>
+    <widget class="QPushButton" name="redButton">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>100</y>
+       <width>75</width>
+       <height>24</height>
+      </rect>
+     </property>
+     <property name="autoFillBackground">
+      <bool>false</bool>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">background-color: rgba(255, 0, 0, 0.2)</string>
+     </property>
+     <property name="text">
+      <string>Red Off</string>
+     </property>
+     <property name="checkable">
+      <bool>false</bool>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="greenButton">
+     <property name="geometry">
+      <rect>
+       <x>90</x>
+       <y>100</y>
+       <width>75</width>
+       <height>24</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">background-color: rgba(0, 255, 0, 0.2)</string>
+     </property>
+     <property name="text">
+      <string>Green Off</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="zoomerButton">
+     <property name="geometry">
+      <rect>
+       <x>170</x>
+       <y>100</y>
+       <width>75</width>
+       <height>24</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">background-color: rgba(0, 0, 255, 0.2)</string>
+     </property>
+     <property name="text">
+      <string>Zoomer Off</string>
+     </property>
+    </widget>
    </widget>
    <widget class="QGroupBox" name="groupBox_2">
     <property name="geometry">
      <rect>
       <x>900</x>
-      <y>110</y>
+      <y>140</y>
       <width>371</width>
       <height>80</height>
      </rect>
@@ -374,7 +428,7 @@
     <property name="geometry">
      <rect>
       <x>900</x>
-      <y>200</y>
+      <y>220</y>
       <width>371</width>
       <height>141</height>
      </rect>

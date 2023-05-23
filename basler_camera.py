@@ -2,6 +2,7 @@ import time
 
 from pypylon import pylon
 
+import utils
 from utils import thread
 
 CAM_RIGHT = "40056496"
@@ -18,6 +19,12 @@ class BaslerCamera:
             print(e)
 
         self.is_grubbed = False
+
+        self.converter = pylon.ImageFormatConverter()
+        # converting to opencv bgr format
+        self.converter.OutputPixelFormat = pylon.PixelType_BGR8packed
+        self.converter.OutputBitAlignment = pylon.OutputBitAlignment_MsbAligned
+
         self.__open()
 
     def __open(self):
@@ -32,12 +39,7 @@ class BaslerCamera:
         self.cam.ExposureAuto = 'Off'
         self.cam.ExposureTimeAbs = 1000
         self.cam.AcquisitionFrameRateEnable = True
-        self.cam.AcquisitionFrameRateAbs = 55
-
-        self.converter = pylon.ImageFormatConverter()
-        # converting to opencv bgr format
-        self.converter.OutputPixelFormat = pylon.PixelType_BGR8packed
-        self.converter.OutputBitAlignment = pylon.OutputBitAlignment_MsbAligned
+        self.cam.AcquisitionFrameRateAbs = 90
 
     @thread
     def start_grabbing(self, event):
@@ -77,6 +79,21 @@ class BaslerCamera:
                 print("Error: ", grab_result.ErrorCode, grab_result.ErrorDescription)
             grab_result.Release()
 
+    @utils.thread
+    def grab_one(self, event):
+        if not self.cam.IsOpen():
+            self.__open()
+        if not self.cam.IsGrabbing():
+            self.cam.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
+        grab_result = self.cam.RetrieveResult(1000, pylon.TimeoutHandling_ThrowException)
+        # Image grabbed successfully?
+        if grab_result.GrabSucceeded():
+            image = self.converter.Convert(grab_result)
+            img = image.GetArray()
+            event(img)
+        else:
+            print("Error: ", grab_result.ErrorCode, grab_result.ErrorDescription)
+        grab_result.Release()
 
     def stop_grabbing(self):
         self.cam.Close()
@@ -89,9 +106,10 @@ def kek(im):
 
 if __name__ == "__main__":
     cam = BaslerCamera(CAM_LEFT)
-    for i in range(30):
+    start_total = time.time()
+    for i in range(66):
         start = time.time()
-        cam.grab(kek)
+        cam.grab_one(kek)
         print(time.time() - start)
-
+    print('total:', time.time() - start_total)
     cam.stop_grabbing()

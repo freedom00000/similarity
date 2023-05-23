@@ -29,7 +29,7 @@ class ImageProcessor:
 
     def make_template(self, template):
         self.src_template = template.copy()
-        cv2.rectangle(self.src_template, (RECT[0][1], RECT[0][0]), (RECT[1][1], RECT[1][0]), (0, 0, 255), 2)
+        cv2.rectangle(self.src_template, (RECT[0][1], RECT[0][0]), (RECT[1][1], RECT[1][0]), (0, 0, 255), 1)
         template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
         self.template = template[RECT[0][0]: RECT[1][0], RECT[0][1]: RECT[1][1]]
 
@@ -48,7 +48,8 @@ class ImageProcessor:
         cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 12), 2)
         return crop
 
-    def compare(self, img):
+    def compare(self, orig):
+        img = orig.copy()
         before_gray = self.template
         after = self.__get_processing_area(img)
         after_gray = cv2.cvtColor(after, cv2.COLOR_BGR2GRAY)
@@ -62,7 +63,7 @@ class ImageProcessor:
         # so we must convert the array to 8-bit unsigned integers in the range
         # [0,255] before we can use it with OpenCV
         diff = (diff * 255).astype("uint8")
-        diff_box = cv2.merge([diff, diff, diff])
+        # diff_box = cv2.merge([diff, diff, diff])
 
         # Threshold the difference image, followed by finding contours to
         # obtain the regions of the two input images that differ

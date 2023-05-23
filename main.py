@@ -31,15 +31,21 @@ class SimilarityApp(QtWidgets.QMainWindow, design.main_window.Ui_MainWindow):
         self.setWindowIcon(QIcon('assets/fractal-icon-8-removebg-preview.ico'))
         self.showMaximized()
 
+        self.stopButton.setDisabled(True)
+
         self.startButton.clicked.connect(self.start)
         self.stopButton.clicked.connect(self.stop)
         self.templateButton.clicked.connect(self.make_template)
         self.clearButton.clicked.connect(self.clear_records)
 
+        self.redButton.clicked.connect(self.__red_click)
+        self.greenButton.clicked.connect(self.__green_click)
+        self.zoomerButton.clicked.connect(self.__zoomer_click)
+
         self.checkBoxRecord.clicked.connect(self.change_record_status)
 
         self.worker = Worker()
-        self.worker.speed_trigger.connect(self.__change_speed)
+        self.worker.status_trigger.connect(self.__change_status)
         self.worker.top_left_trigger.connect(self.__change_top_left_image)
         self.worker.top_right_trigger.connect(self.__change_top_right_image)
         self.worker.btm_left_trigger.connect(self.__change_btm_left_image)
@@ -50,29 +56,54 @@ class SimilarityApp(QtWidgets.QMainWindow, design.main_window.Ui_MainWindow):
         self.fps_cnt = 0
         self.fps = 0
 
-        self.speed_list = [0] * 1000
+        self.speed_list = [0] * 100
         self.x_list = list(range(len(self.speed_list)))
         self.speed_cnt = 0
 
-    def __change_speed(self, speed):
+    def __red_click(self):
+        self.worker.hola.switch_red_light()
+        state = self.worker.hola.red_state
+        style = f"background-color: rgba(255, 0, 0, {0.7 if state else 0.2})"
+        self.redButton.setStyleSheet(style)
+        self.redButton.setText(f'Red {"On" if state else "Off"}')
+
+    def __green_click(self):
+        self.worker.hola.switch_green_light()
+        state = self.worker.hola.green_state
+        style = f"background-color: rgba(0, 255, 0, {0.7 if state else 0.2})"
+        self.greenButton.setStyleSheet(style)
+        self.greenButton.setText(f'Green {"On" if state else "Off"}')
+
+    def __zoomer_click(self):
+        self.worker.hola.switch_zoomer()
+        state = self.worker.hola.zoomer_state
+        style = f"background-color: rgba(0, 0, 255, {0.7 if state else 0.2})"
+        self.zoomerButton.setStyleSheet(style)
+        self.zoomerButton.setText(f'Zoomer {"On" if state else "Off"}')
+
+    def __change_status(self):
         self.labelSpeed.setText(str(self.worker.hola.speed))
         td = timedelta(seconds=time.time() - self.start_time)
         self.labelUptime.setText(str(td))
-        # self.speed_list[self.speed_cnt] = int(speed)
-        # if self.speed_cnt % 10 == 0:
-        #     self.__set_plot_values()
-        #
-        # self.speed_cnt = self.speed_cnt + 1 if self.speed_cnt < len(self.speed_list) - 1 else 0
 
-    @utils.thread
+        self.speed_list.pop(0)
+        self.speed_list.append(self.worker.hola.speed)
+        if self.speed_cnt % 5 == 0:
+            self.__set_plot_values()
+
+        fps = f'left: {round(self.worker.left_cam.cam.ResultingFrameRateAbs.GetValue(), 1)} | ' \
+              f'right: {round(self.worker.right_cam.cam.ResultingFrameRateAbs.GetValue(), 1)} | ' \
+              f'computed: {round(self.fps, 1)}'
+        self.labelFps.setText(fps)
+
     def __set_plot_values(self):
+        self.plotWidget.clear()
         self.plotWidget.plot(self.x_list, self.speed_list)
 
     def __change_top_left_image(self, img):
         self.topLeftLabel.setPixmap(utils.cv_to_qt_image(img))
         if self.fps_cnt > 30:
             self.fps = round(self.fps / self.fps_cnt)
-            self.labelFps.setText(str(self.fps))
             self.fps_cnt = 0
 
         self.fps += 1.0 / (time.time() - self.fps_start)
@@ -96,10 +127,14 @@ class SimilarityApp(QtWidgets.QMainWindow, design.main_window.Ui_MainWindow):
         self.worker.stop_work()
 
     def start(self):
+        self.stopButton.setDisabled(False)
+        self.startButton.setDisabled(True)
         self.start_time = time.time()
         self.worker.start_work()
 
     def stop(self):
+        self.stopButton.setDisabled(True)
+        self.startButton.setDisabled(False)
         self.worker.stop_work1()
 
     def make_template(self):
