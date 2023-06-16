@@ -6,7 +6,7 @@ from skimage.metrics import structural_similarity
 import utils
 
 IMAGE_SIZE = (1088, 1456)
-TEMPLATE_MARGIN = 60
+TEMP_MARGIN = 50
 
 
 def similarity(im1, im2, ksize=(5, 5), iterations=3, rect=None):
@@ -34,18 +34,35 @@ def similarity(im1, im2, ksize=(5, 5), iterations=3, rect=None):
     else:
         drawing = thresh
 
-    contours = cv2.findContours(drawing, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    contours = contours[0] if len(contours) == 2 else contours[1]
+    contours, _ = cv2.findContours(drawing, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     return contours, drawing, diff
 
 
+def detect_sheet(first_frame, test_frame):
+    gray = cv2.cvtColor(test_frame, cv2.COLOR_BGR2GRAY)
+    diff = cv2.absdiff(first_frame, gray)
+    thresh = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)[1]
+    thresh = cv2.dilate(thresh, None, iterations=3)
+
+    contours, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    biggest_cnt = sorted(contours, key=lambda c: cv2.contourArea(c), reverse=True)[0]
+    (x, y, w, h) = cv2.boundingRect(biggest_cnt)
+    # cv2.rectangle(test_frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+    # return (x, y), (x + w, y + h)
+    return x, y, w, h
+
+
 class ImageProcessor:
-    def __init__(self):
-        self.template_rect = ((100, 100), (1000, 1240))
+    def __init__(self, is_right=False, is_bottom=False):
+        self.template_rect = [[100, 100], [1000, 1240]]
         self.src_template = None
         self.template = None
-        self.empty_template = cv2.imread('TestImages/empty_template_left.jpg', cv2.IMREAD_GRAYSCALE)
+
+        self.is_bottom = is_bottom
+        path_to_empty_template = f'TestImages/empty_template_{"right" if is_right else "left"}.jpg'
+
+        self.empty_template = cv2.imread(path_to_empty_template, cv2.IMREAD_GRAYSCALE)
 
     def has_template(self):
         try:
@@ -56,16 +73,25 @@ class ImageProcessor:
     def make_template(self, template):
         self.src_template = template.copy()
 
-        self.template = self.empty_template.copy()
-        cnts, _, _ = similarity(self.empty_template, cv2.cvtColor(template, cv2.COLOR_BGR2GRAY), (3, 3), 1)
-        sheet = sorted(cnts, key=cv2.contourArea, reverse=True)[0]
-        x, y, w, h = cv2.boundingRect(sheet)
-        self.template_rect = (x + TEMPLATE_MARGIN, y + TEMPLATE_MARGIN), (x + w - TEMPLATE_MARGIN, y + h -TEMPLATE_MARGIN)
-        cv2.rectangle(self.src_template, self.template_rect[0], self.template_rect[1], (0, 0, 255), 2)
+        if self.is_bottom:
+            x, y, w, h = detect_sheet(self.empty_template, self.src_template)
+            mx = x - TEMP_MARGIN if x - TEMP_MARGIN >= 0 else TEMP_MARGIN
+            my = y - TEMP_MARGIN if y - TEMP_MARGIN >= 0 else TEMP_MARGIN * 2
+            mw = x + w - TEMP_MARGIN if x + w - TEMP_MARGIN < self.src_template.shape[1] else self.src_template.shape[1]
+            mh = y + h - TEMP_MARGIN if y + h - TEMP_MARGIN < self.src_template.shape[0] else self.src_template.shape[0]
+            self.template_rect = (mx, my), (mw, mh)
+            cv2.rectangle(self.src_template,
+                          self.template_rect[0], self.template_rect[1],
+                          (0, 255, 0),
+                          2)
+            # self.template_rect = p1, p2
+            # self.template_rect[1][1] = p2[1]
 
         template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
         self.template = template[self.template_rect[0][1]: self.template_rect[1][1],
                         self.template_rect[0][0]: self.template_rect[1][0]]
+
+        utils.show(self.src_template)
 
     def __get_processing_area(self, img):
         img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -80,7 +106,6 @@ class ImageProcessor:
 
         crop = img[y: y + h, x: x + w]
         cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 12), 2)
-
         return crop, ((x, y), (x + w, y + h))
 
     def compare(self, img):
@@ -115,9 +140,10 @@ class ImageProcessor:
 def test():
     template = cv2.imread('TestImages/output/template/top_left.jpg')
 
-    pr = ImageProcessor()
+    pr = ImageProcessor(is_right=False, is_bottom=True)
     pr.make_template(template)
     files = glob.glob("TestImages/output/topLeft/*")
+
     for im_path in files:
         im = cv2.imread(im_path)
         res, diff = pr.compare(im)
