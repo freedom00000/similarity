@@ -38,10 +38,10 @@ class Worker(QThread):
 
         self.hola = Hola()
 
-        self.top_left_processor = ImageProcessor()
-        self.top_right_processor = ImageProcessor()
-        self.btm_left_processor = ImageProcessor()
-        self.btm_right_processor = ImageProcessor()
+        self.top_left_processor = ImageProcessor(is_right=False, is_bottom=True)
+        self.top_right_processor = ImageProcessor(is_right=True, is_bottom=True)
+        self.btm_left_processor = ImageProcessor(is_right=False, is_bottom=True)
+        self.btm_right_processor = ImageProcessor(is_right=True, is_bottom=True)
 
         self.left_cam = basler_camera.BaslerCamera(basler_camera.CAM_LEFT)
         self.right_cam = basler_camera.BaslerCamera(basler_camera.CAM_RIGHT)
