@@ -1,4 +1,5 @@
 import glob
+import logging
 
 import cv2
 import numpy as np
@@ -7,6 +8,8 @@ from skimage.metrics import structural_similarity
 import utils
 
 TEMP_MARGIN = 40
+logging.basicConfig(level=logging.INFO, filename="defect.log", filemode="w",
+                    format="%(asctime)s %(levelname)s %(message)s")
 
 
 def detect_sheet(first_frame, test_frame):
@@ -23,6 +26,22 @@ def detect_sheet(first_frame, test_frame):
     return x, y, w, h
 
 
+def compare_defects(d1, d2):
+    max_pixels_spread = 5
+    eqd = []
+
+    def in_range(v1, v2):
+        return v1 in range(v2 - max_pixels_spread, v2 + max_pixels_spread)
+
+    for de1 in d1:
+        for de2 in d2:
+            if in_range(de1[0], de2[0]) and in_range(de1[1], de2[1]) and in_range(de1[2], de2[2]) and in_range(de1[3],
+                                                                                                               de2[3]):
+                eqd.append(de2)
+
+    return eqd
+
+
 class ImageProcessor:
     template_rect = [[100, 100], [1340, 1000]]
 
@@ -34,6 +53,10 @@ class ImageProcessor:
         path_to_empty_template = f'TestImages/empty_template_{"right" if is_right else "left"}.jpg'
 
         self.empty_template = cv2.imread(path_to_empty_template, cv2.IMREAD_GRAYSCALE)
+
+        self.prev_defects = []
+        self.defects_in_row = 0
+        self.max_defects_in_row = 2
 
     def has_template(self):
         try:
@@ -98,6 +121,18 @@ class ImageProcessor:
             print(t, metric_val)
         return metrics
 
+    def check_defects(self, cd):
+        eqd = compare_defects(self.prev_defects, cd)
+        if len(eqd) > 0:
+            self.defects_in_row += 1
+        else:
+            self.defects_in_row = 0
+
+        if self.defects_in_row >= self.max_defects_in_row:
+            logging.info(f'defect detected! count: {len(eqd)}')
+
+        self.prev_defects = cd
+
     def compare(self, orig):
         img = orig.copy()
         before_gray = self.template
@@ -135,10 +170,13 @@ class ImageProcessor:
         # mask = np.zeros(before_gray.shape, dtype='uint8')
         # filled_after = after_gray.copy()
         # drawing = cv2.cvtColor(drawing, cv2.COLOR_GRAY2BGR)
+        current_defects = []
         for c in contours:
             area = cv2.contourArea(c)
             if area > 250:
                 x, y, w, h = cv2.boundingRect(c)
+
+                current_defects.append((x, y, w, h))
                 # cv2.rectangle(before_gray, (x, y), (x + w, y + h), (36, 255, 12), 2)
                 # cv2.rectangle(after_gray, (x, y), (x + w, y + h), (36, 255, 12), 2)
                 # cv2.rectangle(diff_box, (x, y), (x + w, y + h), (36, 255, 12), 2)
@@ -149,6 +187,7 @@ class ImageProcessor:
                 # cv2.drawContours(mask, [c], 0, (255, 255, 255), 2)
                 # cv2.drawContours(filled_after, [c], 0, (0, 255, 0), 2)
 
+        self.check_defects(current_defects)
         # return cv2.cvtColor(filled_after, cv2.COLOR_GRAY2BGR)
         return img
 
@@ -158,7 +197,7 @@ def test():
 
     pr = ImageProcessor(is_right=False, is_bottom=True)
     pr.make_template(template)
-    files = glob.glob("TestImages/output/topLeft0/*")
+    files = glob.glob("TestImages/output/topLeft4/*")
     with open('test_histo.csv', 'w+') as file:
         file.write('file_name;'
                    'HISTCMP_CORREL;'
@@ -171,44 +210,45 @@ def test():
         for im_path in files:
             print(im_path)
             im = cv2.imread(im_path)
-            res, diff, hist_metric = pr.compare(im)
+            # res, diff, hist_metric = pr.compare(im)
+            res = pr.compare(im)
 
-            res = cv2.putText(res,
-                              f'HISTCMP_CORREL:        {hist_metric["HISTCMP_CORREL"]}',
-                              (10, 50), cv2.FONT_HERSHEY_SIMPLEX,
-                              0.8, (100, 255, 255), 2, cv2.LINE_AA)
-            res = cv2.putText(res,
-                              f'HISTCMP_CHISQR:        {hist_metric["HISTCMP_CHISQR"]}',
-                              (10, 75), cv2.FONT_HERSHEY_SIMPLEX,
-                              0.8, (0, 255, 255), 2, cv2.LINE_AA)
-            res = cv2.putText(res,
-                              f'HISTCMP_INTERSET:      {hist_metric["HISTCMP_INTERSET"]}',
-                              (10, 100), cv2.FONT_HERSHEY_SIMPLEX,
-                              0.8, (0, 255, 255), 2, cv2.LINE_AA)
-            res = cv2.putText(res,
-                              f'HISTCMP_BHATTACHARYA: {hist_metric["HISTCMP_BHATTACHARYA"]}',
-                              (10, 125), cv2.FONT_HERSHEY_SIMPLEX,
-                              0.8, (0, 255, 255), 2, cv2.LINE_AA)
-            res = cv2.putText(res,
-                              f'HISTCMP_CHISQR_ALT:    {hist_metric["HISTCMP_CHISQR_ALT"]}',
-                              (10, 150), cv2.FONT_HERSHEY_SIMPLEX,
-                              0.8, (0, 255, 255), 2, cv2.LINE_AA)
-            res = cv2.putText(res,
-                              f'HISTCMP_KL_DIV:         {hist_metric["HISTCMP_KL_DIV"]}',
-                              (10, 175), cv2.FONT_HERSHEY_SIMPLEX,
-                              0.8, (0, 255, 255), 2, cv2.LINE_AA)
-            res = cv2.putText(res,
-                              im_path,
-                              (10, 200), cv2.FONT_HERSHEY_SIMPLEX,
-                              0.8, (0, 255, 255), 2, cv2.LINE_AA)
+            # res = cv2.putText(res,
+            #                   f'HISTCMP_CORREL:        {hist_metric["HISTCMP_CORREL"]}',
+            #                   (10, 50), cv2.FONT_HERSHEY_SIMPLEX,
+            #                   0.8, (100, 255, 255), 2, cv2.LINE_AA)
+            # res = cv2.putText(res,
+            #                   f'HISTCMP_CHISQR:        {hist_metric["HISTCMP_CHISQR"]}',
+            #                   (10, 75), cv2.FONT_HERSHEY_SIMPLEX,
+            #                   0.8, (0, 255, 255), 2, cv2.LINE_AA)
+            # res = cv2.putText(res,
+            #                   f'HISTCMP_INTERSET:      {hist_metric["HISTCMP_INTERSET"]}',
+            #                   (10, 100), cv2.FONT_HERSHEY_SIMPLEX,
+            #                   0.8, (0, 255, 255), 2, cv2.LINE_AA)
+            # res = cv2.putText(res,
+            #                   f'HISTCMP_BHATTACHARYA: {hist_metric["HISTCMP_BHATTACHARYA"]}',
+            #                   (10, 125), cv2.FONT_HERSHEY_SIMPLEX,
+            #                   0.8, (0, 255, 255), 2, cv2.LINE_AA)
+            # res = cv2.putText(res,
+            #                   f'HISTCMP_CHISQR_ALT:    {hist_metric["HISTCMP_CHISQR_ALT"]}',
+            #                   (10, 150), cv2.FONT_HERSHEY_SIMPLEX,
+            #                   0.8, (0, 255, 255), 2, cv2.LINE_AA)
+            # res = cv2.putText(res,
+            #                   f'HISTCMP_KL_DIV:         {hist_metric["HISTCMP_KL_DIV"]}',
+            #                   (10, 175), cv2.FONT_HERSHEY_SIMPLEX,
+            #                   0.8, (0, 255, 255), 2, cv2.LINE_AA)
+            # res = cv2.putText(res,
+            #                   im_path,
+            #                   (10, 200), cv2.FONT_HERSHEY_SIMPLEX,
+            #                   0.8, (0, 255, 255), 2, cv2.LINE_AA)
 
             cv2.imshow('template', utils.resize_image(pr.src_template, scale=50))
             cv2.imshow('src', utils.resize_image(im, scale=50))
             cv2.imshow('res', utils.resize_image(res, scale=50))
-            cv2.imshow('diff', utils.resize_image(diff, scale=50))
-            cv2.waitKey(500)
+            # cv2.imshow('diff', utils.resize_image(diff, scale=50))
+            cv2.waitKey(100)
             print('-' * 40)
-            file.write(f'{im_path};{"".join([f"{hm};" for hm in hist_metric.values()])}\n')
+            # file.write(f'{im_path};{"".join([f"{hm};" for hm in hist_metric.values()])}\n')
 
 
 if __name__ == "__main__":

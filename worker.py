@@ -36,15 +36,15 @@ class Worker(QThread):
         # self.speed = 0
         self.grub_time = get_time_ms()
 
-        self.hola = Hola()
+        # self.hola = Hola()
 
         self.top_left_processor = ImageProcessor(is_right=False, is_bottom=True)
         self.top_right_processor = ImageProcessor(is_right=True, is_bottom=True)
         self.btm_left_processor = ImageProcessor(is_right=False, is_bottom=True)
         self.btm_right_processor = ImageProcessor(is_right=True, is_bottom=True)
 
-        self.left_cam = basler_camera.BaslerCamera(basler_camera.CAM_LEFT)
-        self.right_cam = basler_camera.BaslerCamera(basler_camera.CAM_RIGHT)
+        # self.left_cam = basler_camera.BaslerCamera(basler_camera.CAM_LEFT)
+        # self.right_cam = basler_camera.BaslerCamera(basler_camera.CAM_RIGHT)
 
         self.prev_time = get_time_ms()
         self.speed_no_changes = 0
